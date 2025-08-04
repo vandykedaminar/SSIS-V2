@@ -5,9 +5,9 @@ from tkinter import messagebox
 import re
 import os
 
-DATABASE_NAME = 'students_ssis_pure_sqlite_v3.db' # New DB name for this version with full CRUD
 
-# --- Default Data (to be inserted if DB is empty) ---
+DATABASE_NAME = 'students_ssis_pure_sqlite_v3.db'
+
 DEFAULT_COLLEGES_DATA = [
     ("College of Engineering and Technology", "COET"),
     ("College of Education", "CED"),
@@ -28,7 +28,7 @@ DEFAULT_PROGRAM_LISTS_DATA = {
     "CCS": "BS IN COMPUTER SCIENCE,BS IN INFORMATION TECHNOLOGY,BS IN INFORMATION SYSTEMS,BS IN ELECTRONICS AND COMPUTER TECHNOLOGY (EMBEDDED SYSTEMS),BS IN ELECTRONICS AND COMPUTER TECHNOLOGY (COMMUNICATIONS SYSTEM),DIPLOMA IN ELECTRONICS TECHNOLOGY,DIPLOMA IN ELECTRONICS ENGINEERING TECH (Communication Electronics),DIPLOMA IN ELECTRONICS ENGINEERING TECH (Computer Electronics)"
 }
 
-# --- Database Initialization and Connection ---
+
 def get_db_connection():
     conn = sql.connect(DATABASE_NAME)
     conn.row_factory = sql.Row
@@ -50,7 +50,7 @@ def initialize_database():
             ProgramNames TEXT,
             FOREIGN KEY (CollegeCode) REFERENCES Colleges(CollegeCode) ON DELETE CASCADE ON UPDATE CASCADE
         )
-    ''') # Added ON UPDATE CASCADE
+    ''') 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS Students (
             idnum TEXT PRIMARY KEY,
@@ -61,9 +61,9 @@ def initialize_database():
             yrlvl INTEGER,
             cname TEXT,
             ccode TEXT,
-            FOREIGN KEY (ccode) REFERENCES Colleges(CollegeCode) ON DELETE CASCADE ON UPDATE CASCADE
+            FOREIGN KEY (ccode) REFERENCES Colleges(CollegeCode) ON DELETE SET NULL ON UPDATE CASCADE
         )
-    ''') # Added ON UPDATE CASCADE
+    ''')
     conn.commit()
     conn.close()
 
@@ -79,14 +79,14 @@ def seed_default_data_if_empty():
             for cname, ccode in DEFAULT_COLLEGES_DATA:
                 try:
                     cursor.execute("INSERT INTO Colleges (CollegeName, CollegeCode) VALUES (?, ?)", (cname, ccode))
-                except sql.IntegrityError: pass # Skip if already exists somehow
+                except sql.IntegrityError: pass
             conn.commit()
             for ccode, programs_str in DEFAULT_PROGRAM_LISTS_DATA.items():
                 cursor.execute("SELECT CollegeCode FROM Colleges WHERE CollegeCode = ?", (ccode,))
                 if cursor.fetchone():
                     try:
                         cursor.execute("INSERT INTO CollegeProgramLists (CollegeCode, ProgramNames) VALUES (?, ?)", (ccode, programs_str))
-                    except sql.IntegrityError: pass # Skip
+                    except sql.IntegrityError: pass
             conn.commit()
             print("Default data seeded.")
         except sql.Error as e:
@@ -140,7 +140,7 @@ def autofill_code(event):
         program_combobox['values'] = []; program_combobox.set(''); autofill_program_code_display(None)
 
 def autofill_program_code_display(event):
-    selected_program = progcode_var.get() # progcode_var is tied to program_combobox
+    selected_program = progcode_var.get()
     ProgCode_entry.config(state='normal'); ProgCode_entry.delete(0, END)
     if selected_program: ProgCode_entry.insert(0, selected_program)
     ProgCode_entry.config(state='readonly')
@@ -167,7 +167,7 @@ def clear_input_fields():
     ProgCode_entry.config(state='normal'); ProgCode_entry.delete(0, END); ProgCode_entry.config(state='readonly')
     program_combobox['values'] = []
     if CollName_entry['values']: CollName_entry.current(0); autofill_code(None)
-    else: pass # No colleges, fields remain clear
+    else: pass
 
 def refresh_ui_data():
     """Reloads global dictionaries and updates relevant UI elements."""
@@ -179,11 +179,11 @@ def refresh_ui_data():
     if list(college_mapping_dict.keys()):
         current_selection = collname_var.get()
         if current_selection in college_mapping_dict:
-            CollName_entry.set(current_selection) # Keep current selection if still valid
+            CollName_entry.set(current_selection)
         else:
-            CollName_entry.current(0) # Default to first
+            CollName_entry.current(0)
         autofill_code(None)
-    else: # No colleges left
+    else:
         collname_var.set('')
         CollCode_entry.config(state='normal'); CollCode_entry.delete(0, END); CollCode_entry.config(state='readonly')
         program_combobox['values'] = []; progcode_var.set('')
@@ -191,13 +191,11 @@ def refresh_ui_data():
 
     refresh_student_treeview()
 
-
-# --- CRUD for Colleges ---
 def open_add_college_window():
     add_college_win = Toplevel(root)
     add_college_win.title("Add New College")
     add_college_win.geometry("400x300")
-    add_college_win.grab_set() # Modal behavior
+    add_college_win.grab_set()
 
     Label(add_college_win, text="College Name:").pack(pady=5)
     new_cname_var = StringVar()
@@ -220,7 +218,7 @@ def open_add_college_window():
         conn = get_db_connection(); cursor = conn.cursor()
         try:
             cursor.execute("INSERT INTO Colleges (CollegeName, CollegeCode) VALUES (?, ?)", (cname, ccode))
-            if progs_str: # Only insert if programs are provided
+            if progs_str:
                 cursor.execute("INSERT INTO CollegeProgramLists (CollegeCode, ProgramNames) VALUES (?, ?)", (ccode, progs_str))
             conn.commit()
             messagebox.showinfo("Success", "College added successfully!", parent=add_college_win)
@@ -248,7 +246,7 @@ def open_edit_college_window():
     details_frame.pack(pady=10, fill="x", padx=10)
 
     edit_cname_var, edit_ccode_var = StringVar(), StringVar()
-    original_ccode_hidden = StringVar() # To store the PK for WHERE clause
+    original_ccode_hidden = StringVar()
     add_progs_var = StringVar()
 
     Label(details_frame, text="College Name:").grid(row=0, column=0, sticky="w", pady=3)
@@ -290,13 +288,10 @@ def open_edit_college_window():
 
         conn = get_db_connection(); cursor = conn.cursor()
         try:
-            # Update Colleges table. ON UPDATE CASCADE should handle FKs in Students and CollegeProgramLists if ccode changes
             cursor.execute("UPDATE Colleges SET CollegeName = ?, CollegeCode = ? WHERE CollegeCode = ?", 
                            (new_cname, new_ccode, orig_ccode))
             
-            # Update programs in CollegeProgramLists
-            # Fetch existing programs, append new ones, then update the string
-            cursor.execute("SELECT ProgramNames FROM CollegeProgramLists WHERE CollegeCode = ?", (new_ccode,)) # Use new_ccode if it changed
+            cursor.execute("SELECT ProgramNames FROM CollegeProgramLists WHERE CollegeCode = ?", (new_ccode,))
             current_prog_row = cursor.fetchone()
             existing_progs_list = []
             if current_prog_row and current_prog_row['ProgramNames']:
@@ -304,21 +299,18 @@ def open_edit_college_window():
             
             if progs_to_add_str:
                 newly_added_progs = [p.strip() for p in progs_to_add_str.split(',') if p.strip()]
-                # Add only unique new programs
                 for prog in newly_added_progs:
                     if prog not in existing_progs_list:
                         existing_progs_list.append(prog)
             
             updated_progs_str = ",".join(existing_progs_list)
             
-            # If CollegeProgramLists entry exists, update it. If not (e.g., new college or ccode changed and no entry for new ccode), insert.
             cursor.execute("SELECT COUNT(*) FROM CollegeProgramLists WHERE CollegeCode = ?", (new_ccode,))
             if cursor.fetchone()[0] > 0 :
                  cursor.execute("UPDATE CollegeProgramLists SET ProgramNames = ? WHERE CollegeCode = ?", 
                                (updated_progs_str, new_ccode))
-            else: # This handles case where CollegeCode was changed and old entry was cascade deleted
+            else:
                  cursor.execute("INSERT INTO CollegeProgramLists (CollegeCode, ProgramNames) VALUES (?,?)", (new_ccode, updated_progs_str))
-
 
             conn.commit()
             messagebox.showinfo("Success", "College updated successfully!", parent=edit_college_win)
@@ -342,12 +334,11 @@ def open_edit_student_window():
     edit_stud_win.geometry("400x450")
     edit_stud_win.grab_set()
 
-    # Vars for student fields
     edit_id_var = StringVar(value=stud_values[0])
     edit_fname_var = StringVar(value=stud_values[1])
     edit_lname_var = StringVar(value=stud_values[2])
     edit_sex_var = StringVar(value=stud_values[3])
-    edit_pcode_var = StringVar(value=stud_values[4]) # Selected Program Name
+    edit_pcode_var = StringVar(value=stud_values[4])
     edit_yrlvl_var = StringVar(value=str(stud_values[5]))
     edit_cname_var = StringVar(value=stud_values[6])
     edit_ccode_var = StringVar(value=stud_values[7])
@@ -387,15 +378,15 @@ def open_edit_student_window():
             current_pcode = edit_pcode_var.get()
             if progs:
                 if current_pcode in progs: edit_pcode_combo.set(current_pcode)
-                else: edit_pcode_combo.current(0) # Default to first if current not in list
-            else: edit_pcode_combo.set('') # No programs for this college
-        else: # Should not happen with readonly combobox
+                else: edit_pcode_combo.current(0)
+            else: edit_pcode_combo.set('')
+        else:
             edit_ccode_var.set('')
             edit_pcode_combo['values'] = []
             edit_pcode_combo.set('')
             
     edit_cname_combo.bind("<<ComboboxSelected>>", update_edit_student_college_fields)
-    update_edit_student_college_fields() # Initial population of program list for current college
+    update_edit_student_college_fields()
 
     def save_student_changes():
         idnum, fname, lname, sex = edit_id_var.get(), edit_fname_var.get(), edit_lname_var.get(), edit_sex_var.get()
@@ -423,33 +414,47 @@ def open_edit_student_window():
 
     Button(edit_stud_win, text="Save Changes", command=save_student_changes).pack(pady=15)
 
-
-# --- Other GUI Functions (Delete College, Refresh TreeView, etc. - mostly same) ---
 def open_delete_college_window():
-    delete_college_window = Toplevel(root); delete_college_window.title("Delete College"); delete_college_window.geometry("400x200"); delete_college_window.grab_set()
+    delete_college_window = Toplevel(root); delete_college_window.title("Delete College"); delete_college_window.geometry("400x250"); delete_college_window.grab_set()
     Label(delete_college_window, text="Select College to Delete:", font=("Arial", 12)).pack(pady=10)
-    current_college_names = list(college_mapping_dict.keys()) # Use current in-memory map
-    college_combobox_del = ttk.Combobox(delete_college_window, values=current_college_names, state="readonly", font=("Arial", 10))
+    current_college_names = list(college_mapping_dict.keys())
+    college_combobox_del = ttk.Combobox(delete_college_window, values=current_college_names, state="readonly", font=("Arial", 10), width=35)
     college_combobox_del.pack(pady=10)
     if current_college_names: college_combobox_del.current(0)
+    
     def delete_college_from_db():
         selected_college_name = college_combobox_del.get()
-        if not selected_college_name: messagebox.showwarning("Selection Error", "No college selected!", parent=delete_college_window); return
+        if not selected_college_name: 
+            messagebox.showwarning("Selection Error", "No college selected!", parent=delete_college_window); return
+            
         college_code_to_delete = college_mapping_dict.get(selected_college_name)
-        if not college_code_to_delete: messagebox.showerror("Error", "Could not find code for selected college.", parent=delete_college_window); return
-        confirm = messagebox.askyesno("Confirm Delete", f"Delete '{selected_college_name}' ({college_code_to_delete})?\nThis also deletes its programs and students.", parent=delete_college_window)
+        if not college_code_to_delete: 
+            messagebox.showerror("Error", "Could not find code for selected college.", parent=delete_college_window); return
+
+        confirm = messagebox.askyesno(
+            "Confirm Delete", 
+            f"Delete '{selected_college_name}' ({college_code_to_delete})?\n"
+            f"This will delete the college and its program list, and un-assign any associated students (their college will become blank).", 
+            parent=delete_college_window
+        )
         if not confirm: return
+            
         conn = get_db_connection(); cursor = conn.cursor()
         try:
+            cursor.execute("UPDATE Students SET cname = NULL, pcode = NULL WHERE ccode = ?", (college_code_to_delete,))
             cursor.execute("DELETE FROM Colleges WHERE CollegeCode = ?", (college_code_to_delete,))
             conn.commit()
+            
             if cursor.rowcount > 0:
                 messagebox.showinfo("Success", f"College '{selected_college_name}' deleted.", parent=delete_college_window)
-                refresh_ui_data() # This will reload maps and update UI
+                refresh_ui_data()
                 delete_college_window.destroy()
-            else: messagebox.showerror("Delete Error", "College not found or could not be deleted.", parent=delete_college_window)
-        except sql.Error as e: messagebox.showerror("Database Error", f"Error deleting college: {e}", parent=delete_college_window)
+            else: 
+                messagebox.showerror("Delete Error", "College not found or could not be deleted.", parent=delete_college_window)
+        except sql.Error as e: 
+            messagebox.showerror("Database Error", f"Error deleting college: {e}", parent=delete_college_window)
         finally: conn.close()
+            
     Button(delete_college_window, text="Delete College", command=delete_college_from_db).pack(pady=20)
 
 def refresh_student_treeview(search_query=None, sort_col_name=None):
@@ -492,7 +497,7 @@ def update_search_suggestions(event=None): refresh_student_treeview(search_query
 def sort_by_column_action(column_display_name): refresh_student_treeview(search_query=search_var.get(), sort_col_name=column_display_name)
 def validate_idnum_format(new_value): return re.match(r'^\d{0,4}(-\d{0,4})?$', new_value) is not None
 
-# --- UI Setup (Main Window) ---
+# --- UI Setup ---
 root = Tk()
 root.title("Student System Information (SSIS - Pure SQLite v3)")
 root.geometry("1450x550")
@@ -504,7 +509,6 @@ year_var.set("1")
 # Student Info Input Section
 StuInfo = LabelFrame(frame, text="Student Information", font=("Arial", 12, "bold"), bg="#e0e0e0", bd=5, relief=RIDGE)
 StuInfo.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
-# ... (Labels and Entries for ID, FName, LName, Sex - same as before)
 Label(StuInfo, text="ID Number:").grid(row=0, column=0, padx=5, pady=2, sticky="w")
 vcmd_id = (root.register(validate_idnum_format), '%P')
 Entry(StuInfo, textvariable=idnum_var, font=("Arial", 10), validate='key', validatecommand=vcmd_id, width=25).grid(row=0, column=1, padx=5, pady=2, sticky="ew")
@@ -520,7 +524,6 @@ StuInfo.grid_columnconfigure(1, weight=1)
 # College Info Input Section
 StuColl = LabelFrame(frame, text="College Information", font=("Arial", 12, "bold"), bg="#e0e0e0", bd=5, relief=RIDGE)
 StuColl.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
-# ... (Labels, Combobox for College Name, Entry for College Code - same as before)
 Label(StuColl, text="College Name:").grid(row=0, column=0, padx=5, pady=2, sticky="w")
 CollName_entry = ttk.Combobox(StuColl, values=list(college_mapping_dict.keys()), textvariable=collname_var, font=("Arial", 10), state='readonly', width=40)
 CollName_entry.grid(row=0, column=1, padx=5, pady=2, sticky="ew"); CollName_entry.bind("<<ComboboxSelected>>", autofill_code)
@@ -532,7 +535,6 @@ StuColl.grid_columnconfigure(1, weight=1)
 # Program Info Input Section
 StuProg = LabelFrame(frame, text="Program Information", font=("Arial", 12, "bold"), bg="#e0e0e0", bd=5, relief=RIDGE)
 StuProg.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
-# ... (Labels, Combobox for Program Name, Entry for Program Code, Combobox for Year Level - same as before)
 Label(StuProg, text="Program Name:").grid(row=0, column=0, padx=5, pady=2, sticky="w")
 program_combobox = ttk.Combobox(StuProg, values=[], textvariable=progcode_var, font=("Arial", 10), state='readonly', width=40)
 program_combobox.grid(row=0, column=1, padx=5, pady=2, sticky="ew"); program_combobox.bind("<<ComboboxSelected>>", autofill_program_code_display)
@@ -548,16 +550,15 @@ StuProg.grid_columnconfigure(1, weight=1)
 button_save = ttk.Button(frame, text="Save Student", command=save_student_to_db)
 button_save.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
 
-# Student Display Section (Right side)
+# Student Display Section
 Saved_student_lf = LabelFrame(frame, text="Saved Students", font=("Arial", 12, "bold"), bg="#e0e0e0", bd=5, relief=RIDGE)
 Saved_student_lf.grid(row=0, column=1, rowspan=4, padx=10, pady=5, sticky="nsew")
-frame.grid_columnconfigure(0, weight=1); frame.grid_columnconfigure(1, weight=3) # Adjusted weight for display
-frame.grid_rowconfigure(0, weight=0);frame.grid_rowconfigure(1, weight=0);frame.grid_rowconfigure(2, weight=0); frame.grid_rowconfigure(3, weight=1) # Allow last input row to expand a bit
+frame.grid_columnconfigure(0, weight=1); frame.grid_columnconfigure(1, weight=3)
+frame.grid_rowconfigure(0, weight=0);frame.grid_rowconfigure(1, weight=0);frame.grid_rowconfigure(2, weight=0); frame.grid_rowconfigure(3, weight=1)
 
 # Search and Action Buttons Bar
 Search_frame_top = Frame(Saved_student_lf, bg="#e0e0e0")
 Search_frame_top.pack(side=TOP, fill=X, padx=5, pady=5)
-# ... (Search Entry and Menubuttons for Edit, Delete, Sort - same as before)
 Label(Search_frame_top, text="Search:", font=("Arial", 10), bg="#e0e0e0").pack(side=LEFT, padx=(0,5))
 search_entry = Entry(Search_frame_top, textvariable=search_var, font=("Arial", 10), width=25)
 search_entry.pack(side=LEFT, padx=5); search_entry.bind('<KeyRelease>', update_search_suggestions)
@@ -579,7 +580,6 @@ sort_menu.add_command(label="Last Name", command=lambda: sort_by_column_action("
 # Treeview for Student Data
 Data_display_frame = Frame(Saved_student_lf, bg="#f0f0f0", bd=2, relief=SUNKEN)
 Data_display_frame.pack(side=TOP, fill=BOTH, expand=True, padx=5, pady=5)
-# ... (Scrollbars and Treeview setup - same as before)
 yscroll_tree = Scrollbar(Data_display_frame, orient=VERTICAL); xscroll_tree = Scrollbar(Data_display_frame, orient=HORIZONTAL)
 student_info_cols = ("ID Number", "First Name", "Last Name", "Sex", "Program Code", "Year Level", "College Name", "College Code")
 student_info = ttk.Treeview(Data_display_frame, columns=student_info_cols, yscrollcommand=yscroll_tree.set, xscrollcommand=xscroll_tree.set)
@@ -588,7 +588,6 @@ yscroll_tree.pack(side=RIGHT, fill=Y); xscroll_tree.pack(side=BOTTOM, fill=X); s
 for col_name in student_info_cols: student_info.heading(col_name, text=col_name); student_info.column(col_name, width=120, anchor='w')
 student_info['show'] = 'headings'
 
-# Initial UI population
 if list(college_mapping_dict.keys()): CollName_entry.current(0); autofill_code(None)
 refresh_student_treeview()
 
